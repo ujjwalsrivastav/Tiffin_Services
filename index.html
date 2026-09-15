@@ -439,10 +439,9 @@
               <span><span class="status-dot" style="background:#9333ea;"></span> Dinner (D)</span>
               <span><span class="status-dot" style="background:#d97706;"></span> Add-ons Attached</span>
               <span><span class="status-dot" style="background:#cbd5e1;"></span> Weekend Skipped</span>
-              <span><span class="status-dot" style="background:#f43f5e;"></span> Custom Leave/Off</span>
             </div>
             <div class="fst-italic">
-              <i class="fa-regular fa-lightbulb text-warning me-1"></i> Click any day card for Add-ons & Leave settings
+              <i class="fa-regular fa-lightbulb text-warning me-1"></i> Click any day to view or attach Add-ons
             </div>
           </div>
         </div>
@@ -496,16 +495,10 @@
         <div class="modal-body">
           <input type="hidden" id="selectedModalDay">
 
-          <!-- Day Status Switches -->
+          <!-- Day Meal Controls -->
           <div class="p-3 bg-light rounded-3 mb-3 border">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="fw-bold small">Day Subscription Status</span>
-              <div class="form-check form-switch m-0">
-                <input class="form-check-input" type="checkbox" id="modalDayActiveSwitch" onchange="toggleDayActiveStatus(this.checked)">
-                <label class="form-check-label small fw-semibold" id="modalDayActiveLabel" for="modalDayActiveSwitch">Deliverable Day</label>
-              </div>
-            </div>
-            <div id="modalMealTogglesWrap" class="d-flex gap-2 pt-2 border-top">
+            <span class="fw-bold small d-block mb-2 text-muted text-uppercase">Meals for this Day</span>
+            <div id="modalMealTogglesWrap" class="d-flex gap-2">
               <button type="button" id="modalToggleLunchBtn" class="btn btn-sm w-50 fw-bold btn-outline-primary" onclick="toggleModalMeal('lunch')">
                 <i class="fa-solid fa-sun me-1"></i> Lunch
               </button>
@@ -686,13 +679,13 @@
 
     let appState = {
       customer: {
-        name: "Ujjwal Srivastava",
+        name: "Rahul Sharma",
         room: "Flat 402, Green Apts",
-        phone: "8888888888"
+        phone: "9876543210"
       },
       config: {
-        priceLunch: 80,
-        priceDinner: 80,
+        priceLunch: 50,
+        priceDinner: 70,
         includeSaturday: false,
         includeSunday: false
       },
@@ -836,8 +829,6 @@
 
         if (isWeekendDisabled) {
           cell.classList.add("weekend-off");
-        } else if (dayState.isOff) {
-          cell.classList.add("custom-off");
         }
 
         // Top Header of Cell
@@ -851,21 +842,12 @@
           </div>
         `;
 
-        // Meal Buttons or Off state
+        // Meal Buttons or Weekend Off state
         let bodyHtml = "";
         if (isWeekendDisabled) {
           bodyHtml = `<div class="text-center small py-2 fw-semibold opacity-75">Weekend Off</div>`;
-        } else if (dayState.isOff) {
-          bodyHtml = `
-            <div class="text-center small py-1 text-danger fw-semibold">
-              <i class="fa-solid fa-ban me-1"></i> Paused / Off
-            </div>
-            <div class="text-center">
-              <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.68rem;" onclick="resumeDay(${d})">Resume</button>
-            </div>
-          `;
         } else {
-          // Lunch / Dinner Toggle Buttons
+          // Lunch / Dinner Toggle Buttons - directly available
           bodyHtml = `
             <div class="meal-toggles">
               <button class="meal-btn ${dayState.lunch ? 'active-lunch' : ''}" onclick="toggleMeal(${d}, 'lunch', event)">
@@ -906,18 +888,6 @@
       renderCalendar();
     }
 
-    // Resume an off day
-    function resumeDay(day) {
-      const monthData = getMonthData();
-      if (monthData[day]) {
-        monthData[day].isOff = false;
-        monthData[day].lunch = true;
-        monthData[day].dinner = true;
-        saveStorage();
-        renderCalendar();
-      }
-    }
-
     // Bulk actions
     function bulkMarkAll(state) {
       const monthData = getMonthData();
@@ -931,10 +901,9 @@
         const dayOfWeek = new Date(year, month, d).getDay();
         const isWeekendDisabled = (dayOfWeek === 6 && !satActive) || (dayOfWeek === 0 && !sunActive);
         if (!isWeekendDisabled) {
-          if (!monthData[d]) monthData[d] = { lunch: state, dinner: state, isOff: !state, addons: {}, note: "" };
+          if (!monthData[d]) monthData[d] = { lunch: state, dinner: state, addons: {}, note: "" };
           monthData[d].lunch = state;
           monthData[d].dinner = state;
-          monthData[d].isOff = false;
         }
       }
       saveStorage();
@@ -958,19 +927,17 @@
       appState.catalog.forEach(item => catalogPriceMap[item.id] = item.price);
 
       Object.entries(monthData).forEach(([day, s]) => {
-        if (!s.isOff) {
-          if (s.lunch) lunchCount++;
-          if (s.dinner) dinnerCount++;
-          if (s.lunch || s.dinner) activeDaysCount++;
+        if (s.lunch) lunchCount++;
+        if (s.dinner) dinnerCount++;
+        if (s.lunch || s.dinner) activeDaysCount++;
 
-          if (s.addons) {
-            Object.entries(s.addons).forEach(([addonId, qty]) => {
-              if (qty > 0) {
-                addonsCount += qty;
-                addonsTotalCost += (qty * (catalogPriceMap[addonId] || 0));
-              }
-            });
-          }
+        if (s.addons) {
+          Object.entries(s.addons).forEach(([addonId, qty]) => {
+            if (qty > 0) {
+              addonsCount += qty;
+              addonsTotalCost += (qty * (catalogPriceMap[addonId] || 0));
+            }
+          });
         }
       });
 
@@ -1015,12 +982,7 @@
       document.getElementById("modalDayTitle").innerHTML = `<i class="fa-regular fa-calendar-days me-2 text-warning"></i> Meal & Add-ons for ${day} ${month} ${year}`;
 
       const monthData = getMonthData();
-      const s = monthData[day] || { lunch: true, dinner: true, isOff: false, addons: {}, note: "" };
-
-      // Set switches
-      const activeSwitch = document.getElementById("modalDayActiveSwitch");
-      activeSwitch.checked = !s.isOff;
-      document.getElementById("modalDayActiveLabel").innerText = s.isOff ? "Subscription Paused / Holiday" : "Deliverable Day";
+      const s = monthData[day] || { lunch: true, dinner: true, addons: {}, note: "" };
 
       updateModalMealButtons(s.lunch, s.dinner);
 
@@ -1058,13 +1020,6 @@
       el.innerText = curr;
     }
 
-    function toggleDayActiveStatus(isActive) {
-      document.getElementById("modalDayActiveLabel").innerText = isActive ? "Deliverable Day" : "Subscription Paused / Holiday";
-      const wrap = document.getElementById("modalMealTogglesWrap");
-      wrap.style.opacity = isActive ? "1" : "0.35";
-      wrap.style.pointerEvents = isActive ? "all" : "none";
-    }
-
     let tempModalLunch = true;
     let tempModalDinner = true;
     function updateModalMealButtons(lunch, dinner) {
@@ -1095,12 +1050,10 @@
     function saveDayDetails() {
       const day = currentModalDay;
       const monthData = getMonthData();
-      const isActive = document.getElementById("modalDayActiveSwitch").checked;
 
       if (!monthData[day]) monthData[day] = {};
-      monthData[day].isOff = !isActive;
-      monthData[day].lunch = isActive ? tempModalLunch : false;
-      monthData[day].dinner = isActive ? tempModalDinner : false;
+      monthData[day].lunch = tempModalLunch;
+      monthData[day].dinner = tempModalDinner;
       monthData[day].note = document.getElementById("modalDayNote").value.trim();
 
       // Collect Addons
@@ -1215,7 +1168,7 @@
       // Addon aggregate breakdown
       const addonTotals = {};
       Object.values(monthData).forEach(d => {
-        if (!d.isOff && d.addons) {
+        if (d.addons) {
           Object.entries(d.addons).forEach(([id, qty]) => {
             if (qty > 0) {
               addonTotals[id] = (addonTotals[id] || 0) + qty;
